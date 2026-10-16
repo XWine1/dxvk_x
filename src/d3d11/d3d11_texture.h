@@ -1,5 +1,7 @@
 #pragma once
 
+#include <atomic>
+
 #include "../util/util_small_vector.h"
 
 #include "../dxvk/dxvk_cs.h"
@@ -73,7 +75,15 @@ namespace dxvk {
     VkExtent3D      Extent;
   };
   
-  
+  class D3D11MinLodState : public RcObject {
+
+  public:
+
+    std::atomic<float>  cpuValue = { 0.0f };
+    float               csValue  = 0.0f;
+
+  };
+
   /**
    * \brief D3D11 common texture object
    * 
@@ -157,6 +167,10 @@ namespace dxvk {
      */
     DXGI_USAGE GetDxgiUsage() const {
       return m_dxgiUsage;
+    }
+
+    const Rc<D3D11MinLodState>& GetMinLodState() const {
+      return m_minLodState;
     }
 
     /**
@@ -583,6 +597,7 @@ namespace dxvk {
     VkFormat                      m_packedFormat;
     
     Rc<DxvkImage>                 m_image;
+    Rc<D3D11MinLodState>          m_minLodState;
     small_vector<MappedBuffer, 6> m_buffers;
     small_vector<MappedInfo, 6>   m_mapInfo;
 

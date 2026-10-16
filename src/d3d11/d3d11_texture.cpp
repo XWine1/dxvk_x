@@ -247,6 +247,9 @@ namespace dxvk {
     if (m_mapMode == D3D11_COMMON_TEXTURE_MAP_MODE_DIRECT)
       m_mapPtr = m_image->mapPtr(0);
 
+    if ((m_desc.MiscFlags & D3D11_RESOURCE_MISC_RESOURCE_CLAMP) && m_desc.MipLevels > 1u)
+      m_minLodState = new D3D11MinLodState();
+
     if (imageInfo.sharing.mode == DxvkSharedHandleMode::Export) {
       if (m_desc.MiscFlags & D3D11_RESOURCE_MISC_SHARED_KEYEDMUTEX) {
         try {

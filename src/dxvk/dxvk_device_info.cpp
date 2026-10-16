@@ -30,6 +30,7 @@ namespace dxvk {
     HANDLE_EXT(extFullScreenExclusive);            \
     HANDLE_EXT(extGraphicsPipelineLibrary);        \
     HANDLE_EXT(extHdrMetadata);                    \
+    HANDLE_EXT(extImageViewMinLod);                \
     HANDLE_EXT(extLineRasterization);              \
     HANDLE_EXT(extMemoryBudget);                   \
     HANDLE_EXT(extMemoryPriority);                 \
@@ -988,6 +989,9 @@ namespace dxvk {
 
       /* HDR metadata */
       ENABLE_EXT(extHdrMetadata, false),
+
+      /* Per-view min LOD clamp */
+      ENABLE_EXT_FEATURE(extImageViewMinLod, minLod, false),
 
       /* Line rasterization features for client APIs */
       ENABLE_EXT_FEATURE(extLineRasterization, rectangularLines,  false),

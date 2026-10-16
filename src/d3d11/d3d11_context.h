@@ -988,6 +988,10 @@ namespace dxvk {
             uint32_t                          Slot,
             bool                              IsNull);
 
+    void RebindShaderResourcesForMinLod(
+            D3D11ShaderType                   ShaderStage,
+      const D3D11MinLodState*                 pState);
+
     bool DirtyComputeUnorderedAccessView(
             uint32_t                          Slot,
             bool                              IsNull);

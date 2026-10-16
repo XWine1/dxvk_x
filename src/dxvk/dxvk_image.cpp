@@ -799,8 +799,10 @@ namespace dxvk {
 
     // We need to expose RT and UAV swizzles to the backend,
     // but cannot legally pass them down to Vulkan
-    if ((key.usage & ~VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT) != VK_IMAGE_USAGE_SAMPLED_BIT)
+    if ((key.usage & ~VK_IMAGE_USAGE_ATTACHMENT_FEEDBACK_LOOP_BIT_EXT) != VK_IMAGE_USAGE_SAMPLED_BIT) {
       key.packedSwizzle = 0u;
+      key.minLod = 0u;
+    }
 
     return m_image->m_storage->createImageView(key);
   }

@@ -377,6 +377,8 @@ namespace dxvk {
     uint16_t layerCount = 0u;
     /// Packed component swizzle, with four bits per component
     uint16_t packedSwizzle = 0u;
+    /// Minimum LOD for the view
+    uint16_t minLod = 0u;
 
     size_t hash() const {
       DxvkHashState hash;
@@ -388,7 +390,7 @@ namespace dxvk {
       hash.add(uint32_t(allowTypeMismatch));
       hash.add(uint32_t(mipIndex) | (uint32_t(mipCount) << 16));
       hash.add(uint32_t(layerIndex) | (uint32_t(layerCount) << 16));
-      hash.add(uint32_t(packedSwizzle));
+      hash.add(uint32_t(packedSwizzle) | (uint32_t(minLod) << 16));
       return hash;
     }
 
@@ -403,7 +405,8 @@ namespace dxvk {
           && mipCount == other.mipCount
           && layerIndex == other.layerIndex
           && layerCount == other.layerCount
-          && packedSwizzle == other.packedSwizzle;
+          && packedSwizzle == other.packedSwizzle
+          && minLod == other.minLod;
     }
 
     VkComponentMapping unpackSwizzle() const {
@@ -412,6 +415,14 @@ namespace dxvk {
         VkComponentSwizzle((packedSwizzle >>  4) & 0xf),
         VkComponentSwizzle((packedSwizzle >>  8) & 0xf),
         VkComponentSwizzle((packedSwizzle >> 12) & 0xf) };
+    }
+
+    static uint16_t packMinLod(float lod) {
+      return bit::encodeFixed<uint16_t, 4, 8>(lod);
+    }
+
+    float unpackMinLod() const {
+      return bit::decodeFixed<uint16_t, 4, 8>(minLod);
     }
 
     static uint16_t packSwizzle(VkComponentMapping mapping) {

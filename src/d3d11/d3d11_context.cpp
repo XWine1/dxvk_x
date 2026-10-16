@@ -2187,7 +2187,8 @@ namespace dxvk {
         if (!DirtyComputeUnorderedAccessView(StartSlot + i, !uav))
           BindUnorderedAccessView(D3D11ShaderType::eCompute, StartSlot + i, uav);
 
-        ResolveCsSrvHazards(uav);
+        // Xbox allows bound UAVs and SRVs to share the same resource
+        // Orginal: ResolveCsSrvHazards(uav);
       }
     }
 
@@ -2699,21 +2700,45 @@ namespace dxvk {
   void STDMETHODCALLTYPE D3D11CommonContext<ContextType>::SetResourceMinLOD(
           ID3D11Resource*                   pResource,
           FLOAT                             MinLOD) {
-    bool s_errorShown = false;
+    D3D10DeviceLock lock = LockContext();
 
-    if (std::exchange(s_errorShown, true))
-      Logger::err("D3D11DeviceContext::SetResourceMinLOD: Not implemented");
+    D3D11CommonTexture* texture = GetCommonTexture(pResource);
+
+    if (!texture)
+      return;
+
+    Rc<D3D11MinLodState> state = texture->GetMinLodState();
+
+    if (!state)
+      return;
+
+    if (!(MinLOD > 0.0f))
+      MinLOD = 0.0f;
+
+    state->cpuValue = MinLOD;
+
+    EmitCs([
+      cState  = state,
+      cMinLod = MinLOD
+    ] (DxvkContext* ctx) mutable {
+      cState->csValue = cMinLod;
+    });
+
+    for (uint32_t i = 0; i < D3D11ShaderTypeCount; i++)
+      RebindShaderResourcesForMinLod(D3D11ShaderType(i), state.ptr());
   }
   
   
   template<typename ContextType>
   FLOAT STDMETHODCALLTYPE D3D11CommonContext<ContextType>::GetResourceMinLOD(ID3D11Resource* pResource) {
-    bool s_errorShown = false;
+    D3D10DeviceLock lock = LockContext();
 
-    if (std::exchange(s_errorShown, true))
-      Logger::err("D3D11DeviceContext::GetResourceMinLOD: Not implemented");
+    D3D11CommonTexture* texture = GetCommonTexture(pResource);
 
-    return 0.0f;
+    if (!texture || !texture->GetMinLodState())
+      return 0.0f;
+
+    return texture->GetMinLodState()->cpuValue;
   }
 
 
@@ -3962,14 +3987,24 @@ namespace dxvk {
 
     if (pResource) {
       if (pResource->GetViewInfo().Dimension != D3D11_RESOURCE_DIMENSION_BUFFER) {
-        EmitCs([
-          cSlotId = slotId,
-          cStage  = GetShaderStage(ShaderStage),
-          cView   = pResource->GetImageView()
-        ] (DxvkContext* ctx) mutable {
-          ctx->bindResourceImageView(cStage, cSlotId,
-            Forwarder::move(cView));
-        });
+        if (unlikely(pResource->GetMinLodState())) {
+          EmitCs([
+            cSlotId  = slotId,
+            cStage   = GetShaderStage(ShaderStage),
+            cBinding = pResource->GetMinLodBinding()
+          ] (DxvkContext* ctx) mutable {
+            ctx->bindResourceImageView(cStage, cSlotId, cBinding.resolve());
+          });
+        } else {
+          EmitCs([
+            cSlotId = slotId,
+            cStage  = GetShaderStage(ShaderStage),
+            cView   = pResource->GetImageView()
+          ] (DxvkContext* ctx) mutable {
+            ctx->bindResourceImageView(cStage, cSlotId,
+              Forwarder::move(cView));
+          });
+        }
       } else {
         EmitCs([
           cSlotId = slotId,
@@ -4615,6 +4650,24 @@ namespace dxvk {
       m_state.lazy.bindingsUsed[ShaderStage].srvMask[idx],
       m_state.lazy.bindingsDirty[ShaderStage].srvMask[idx],
       uint64_t(1u) << Slot, IsNull);
+  }
+
+
+  template<typename ContextType>
+  void D3D11CommonContext<ContextType>::RebindShaderResourcesForMinLod(
+          D3D11ShaderType                   ShaderStage,
+    const D3D11MinLodState*                 pState) {
+    const auto& bindings = m_state.srv[ShaderStage];
+
+    for (uint32_t i = 0; i < bindings.maxCount; i++) {
+      D3D11ShaderResourceView* view = bindings.views[i].ptr();
+
+      if (!view || view->GetMinLodState().ptr() != pState)
+        continue;
+
+      if (!DirtyShaderResource(ShaderStage, i, false))
+        BindShaderResource(ShaderStage, i, view);
+    }
   }
 
 
@@ -5290,7 +5343,10 @@ namespace dxvk {
 
       if (bindings.views[StartSlot + i] != resView) {
         if (likely(resView != nullptr)) {
-          if (unlikely(resView->TestHazards())) {
+          // see the Xbox comment in CSSetUnorderedAccessViews
+          // TODO: should we allow this for other shader stages as well?
+          // FH2 only does this in CS, so it might be a good idea to keep it only for CS for now to be safe.
+          if (ShaderStage != D3D11ShaderType::eCompute && unlikely(resView->TestHazards())) {
             if (TestSrvHazards<ShaderStage>(resView))
               resView = nullptr;
 

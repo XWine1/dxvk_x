@@ -218,6 +218,13 @@ namespace dxvk {
     viewInfo.subresourceRange.baseArrayLayer = key.layerIndex;
     viewInfo.subresourceRange.layerCount = key.layerCount;
 
+    VkImageViewMinLodCreateInfoEXT minLod = { VK_STRUCTURE_TYPE_IMAGE_VIEW_MIN_LOD_CREATE_INFO_EXT };
+
+    if (key.minLod && m_device->features().extImageViewMinLod.minLod) {
+      minLod.minLod = key.unpackMinLod();
+      minLod.pNext = std::exchange(usage.pNext, &minLod);
+    }
+
     if (renderTargetUsage || !m_device->canUseDescriptorHeap() || m_device->hasCudaInterop()) {
       descriptor.legacy.image.imageLayout = key.layout;
 

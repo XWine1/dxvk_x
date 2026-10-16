@@ -81,10 +81,10 @@ namespace dxvk {
       viewInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT;
       viewInfo.packedSwizzle = DxvkImageViewKey::packSwizzle(formatInfo.Swizzle);
 
-      // Shaders expect the stencil value in the G component
+      // Xbox shaders expect the stencil value in the R component
       if (viewInfo.aspects == VK_IMAGE_ASPECT_STENCIL_BIT) {
         viewInfo.packedSwizzle = DxvkImageViewKey::packSwizzle({
-          VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_R,
+          VK_COMPONENT_SWIZZLE_R,    VK_COMPONENT_SWIZZLE_ZERO,
           VK_COMPONENT_SWIZZLE_ZERO, VK_COMPONENT_SWIZZLE_ZERO });
       }
       
@@ -178,10 +178,31 @@ namespace dxvk {
 
       // Create the underlying image view object
       m_imageView = texture->GetImage()->createView(viewInfo);
+
+      if (texture->GetMinLodState()) {
+        m_minLod.view  = m_imageView;
+        m_minLod.key   = viewInfo;
+        m_minLod.state = texture->GetMinLodState();
+      }
     }
   }
   
   
+  Rc<DxvkImageView> D3D11SrvMinLodBinding::resolve() const {
+    float lod = state->csValue - float(key.mipIndex);
+    lod = std::clamp(lod, 0.0f, float(key.mipCount - 1u));
+
+    uint16_t packed = DxvkImageViewKey::packMinLod(lod);
+
+    if (!packed)
+      return view;
+
+    DxvkImageViewKey clampedKey = key;
+    clampedKey.minLod = packed;
+    return view->image()->createView(clampedKey);
+  }
+
+
   D3D11ShaderResourceView::~D3D11ShaderResourceView() {
     m_destructionNotifier.Notify();
 
@@ -190,6 +211,7 @@ namespace dxvk {
 
     m_imageView = nullptr;
     m_bufferView = nullptr;
+    m_minLod = D3D11SrvMinLodBinding();
   }
   
   

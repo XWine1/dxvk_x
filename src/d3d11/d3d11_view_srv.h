@@ -5,12 +5,21 @@
 #include "../d3d10/d3d10_view_srv.h"
 
 #include "d3d11_device_child.h"
+#include "d3d11_texture.h"
 #include "d3d11_view.h"
 
 namespace dxvk {
   
   class D3D11Device;
-  
+
+  struct D3D11SrvMinLodBinding {
+    Rc<DxvkImageView>     view  = nullptr;
+    DxvkImageViewKey      key   = { };
+    Rc<D3D11MinLodState>  state = nullptr;
+
+    Rc<DxvkImageView> resolve() const;
+  };
+
   /**
    * \brief Shader resource view
    */
@@ -61,6 +70,14 @@ namespace dxvk {
       return m_imageView;
     }
 
+    const Rc<D3D11MinLodState>& GetMinLodState() const {
+      return m_minLod.state;
+    }
+
+    const D3D11SrvMinLodBinding& GetMinLodBinding() const {
+      return m_minLod;
+    }
+
     D3D10ShaderResourceView* GetD3D10Iface() {
       return &m_d3d10;
     }
@@ -87,6 +104,7 @@ namespace dxvk {
     D3D11_VK_VIEW_INFO                m_info;
     Rc<DxvkBufferView>                m_bufferView;
     Rc<DxvkImageView>                 m_imageView;
+    D3D11SrvMinLodBinding             m_minLod;
     D3D10ShaderResourceView           m_d3d10;
 
     D3DDestructionNotifier            m_destructionNotifier;
